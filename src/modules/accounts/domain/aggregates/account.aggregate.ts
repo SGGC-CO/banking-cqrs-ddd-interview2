@@ -8,25 +8,39 @@ export class Account extends AggregateRoot {
   private _currency: string;
   private _balance = 0;
 
-  static open(id: string, ownerId: string, currency: string, initialBalance: number) {
-    if (initialBalance < 0) throw new Error('Initial balance cannot be negative');
+  static open(
+    id: string,
+    ownerId: string,
+    currency: string,
+    initialBalance: number,
+  ) {
+    if (initialBalance < 0)
+      throw new Error("Initial balance cannot be negative");
     const acc = new Account();
     acc.apply(new AccountOpenedEvent(id, ownerId, currency, initialBalance));
     return acc;
   }
 
+  /**
+   * Rehydrate Account aggregate from event history
+   */
+  static rehydrate(storedEvents: any[]): Account {
+    return AggregateRoot.rehydrateAggregate(Account, storedEvents);
+  }
+
   deposit(amount: number) {
-    if (amount <= 0) throw new Error('Deposit amount must be positive');
+    if (amount <= 0) throw new Error("Deposit amount must be positive");
     this.apply(new DepositedEvent(this.id!, amount));
   }
 
   /**
    * Withdraw money from account
-   * INCOMPLETE - TO BE IMPLEMENTED BY INTERVIEWEE
+   * Validates amount and prevents overdraft
    */
   withdraw(amount: number) {
-    // TODO: Implement withdrawal with proper validation
-    throw new Error('Method not implemented');
+    if (amount <= 0) throw new Error("Withdrawal amount must be positive");
+    if (this._balance < amount) throw new Error("Insufficient funds");
+    this.apply(new WithdrawnEvent(this.id!, amount));
   }
 
   onAccountOpenedEvent(e: AccountOpenedEvent) {
@@ -37,12 +51,12 @@ export class Account extends AggregateRoot {
     this.setVersion(0);
   }
 
-  onDepositedEvent(e: DepositedEvent) { 
-    this._balance += e.amount; 
+  onDepositedEvent(e: DepositedEvent) {
+    this._balance += e.amount;
   }
 
-  onWithdrawnEvent(e: WithdrawnEvent) { 
-    this._balance -= e.amount; 
+  onWithdrawnEvent(e: WithdrawnEvent) {
+    this._balance -= e.amount;
   }
 
   toJSON() {
