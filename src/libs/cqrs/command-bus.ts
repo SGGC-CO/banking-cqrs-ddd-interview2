@@ -15,10 +15,10 @@ export class CommandBus {
 
   /**
    * Execute a command
-   * INCOMPLETE - TO BE IMPLEMENTED BY INTERVIEWEE
    */
   async execute<T extends Command, R = any>(command: T): Promise<R> {
-    // TODO: Implement command execution
-    throw new Error('Method not implemented');
+    const handler = this.handlers.get(command.constructor.name);
+    if (!handler) throw new Error(`No handler for ${command.constructor.name}`);
+    return handler.execute(command);
   }
 }
