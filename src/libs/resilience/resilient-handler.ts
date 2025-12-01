@@ -1,6 +1,7 @@
 import { CircuitBreakerError } from './circuit-breaker';
 import { IdempotencyStore } from './idempotency-redis';
 import { retry, RetryOptions } from './retry';
+import { randomUUID } from "crypto";
 
 /**
  * Base handler with built-in idempotency and retry logic
@@ -25,20 +26,22 @@ export abstract class ResilientCommandHandler<TCommand, TResult> {
    * Execute command with automatic idempotency and retry
    */
   async execute(cmd: TCommand): Promise<TResult> {
-    // If idempotency is enabled, check cache first
-    if (this.idempotency && this.isIdempotent()) {
+    // If idempotency is enabled and command is idempotent, check cache first
+    if (this.idempotency && this.isIdempotent(cmd)) {
       const idempotencyKey = this.generateIdempotencyKey(cmd);
 
       const cachedResult = await this.idempotency.get(idempotencyKey);
       if (cachedResult) {
-        console.log(`[${this.constructor.name}] Duplicate request detected, returning cached result`);
+        console.log(
+          `[${this.constructor.name}] Duplicate request detected, returning cached result`,
+        );
         return cachedResult;
       }
 
       // Execute with retry
       const result = await retry(
         () => this.executeInternal(cmd),
-        this.retryOptions
+        this.retryOptions,
       );
 
       // Cache the result
@@ -48,10 +51,18 @@ export abstract class ResilientCommandHandler<TCommand, TResult> {
     }
 
     // No idempotency, just execute with retry
-    return retry(
-      () => this.executeInternal(cmd),
-      this.retryOptions
-    );
+    return retry(() => this.executeInternal(cmd), this.retryOptions);
+  }
+
+  /**
+   * Generate a fallback idempotency key when client doesn't provide one.
+   * Override this in handlers to customize fallback key generation.
+   * Default implementation generates a unique key per request.
+   */
+  protected generateFallbackIdempotencyKey(cmd: TCommand): string {
+    // Generate unique key per request to avoid blocking legitimate duplicates
+    // This ensures each request gets processed while still enabling idempotency checks
+    return randomUUID();
   }
 
   /**
@@ -65,9 +76,10 @@ export abstract class ResilientCommandHandler<TCommand, TResult> {
   protected abstract generateIdempotencyKey(cmd: TCommand): string;
 
   /**
-   * Override to disable idempotency for specific handlers
+   * Override to disable idempotency for specific handlers or commands
+   * @param cmd - The command being executed
    */
-  protected isIdempotent(): boolean {
+  protected isIdempotent(cmd: TCommand): boolean {
     return true;
   }
 
