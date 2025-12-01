@@ -18,7 +18,7 @@ export async function retry<T>(
     maxAttempts,
     delayMs,
     backoffMultiplier = 1,
-    retryableErrors = [CircuitBreakerError],
+    retryableErrors = [], // Default: no retryable errors (must be explicitly configured)
   } = options;
 
   let lastError: Error;

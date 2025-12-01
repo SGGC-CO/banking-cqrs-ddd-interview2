@@ -12,7 +12,7 @@ export abstract class ResilientCommandHandler<TCommand, TResult> {
     maxAttempts: 3,
     delayMs: 2000,
     backoffMultiplier: 2,
-    retryableErrors: [CircuitBreakerError],
+    retryableErrors: [], // Don't retry CircuitBreakerError - fail fast when circuit is OPEN
   };
 
   constructor(protected readonly idempotency?: IdempotencyStore) {
