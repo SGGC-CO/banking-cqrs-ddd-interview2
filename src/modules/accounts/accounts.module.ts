@@ -1,22 +1,26 @@
 import { Module } from '@nestjs/common';
-import { CommandBus } from '../../libs/cqrs/command-bus';
-import { EventBus } from '../../libs/cqrs/event-bus';
-import { QueryBus } from '../../libs/cqrs/query-bus';
-import { InMemoryIdempotencyStore, RedisIdempotencyStore } from '../../libs/resilience/idempotency-redis';
+import { ConfigService } from "@nestjs/config";
+import { CommandBus } from "../../libs/cqrs/command-bus";
+import { EventBus } from "../../libs/cqrs/event-bus";
+import { QueryBus } from "../../libs/cqrs/query-bus";
+import {
+  InMemoryIdempotencyStore,
+  RedisIdempotencyStore,
+} from "../../libs/resilience/idempotency-redis";
 import { DatabaseModule } from "../database/database.module";
-import { DepositHandler } from './application/handlers/deposit.handler';
-import { GetAccountHandler } from './application/handlers/get-account.handler';
-import { OpenAccountHandler } from './application/handlers/open-account.handler';
-import { WithdrawHandler } from './application/handlers/withdraw.handler';
-import { AccountEventRepository } from './domain/repositories/account-event.repository';
-import { AccountsController } from './http/accounts.controller';
-import { BusWiringService } from './infra/bus-wiring.service';
-import { MongoEventStore } from './infra/event-store/event-store';
-import { AccountsProjection } from './infra/projection/accounts.projection';
+import { DepositHandler } from "./application/handlers/deposit.handler";
+import { GetAccountHandler } from "./application/handlers/get-account.handler";
+import { OpenAccountHandler } from "./application/handlers/open-account.handler";
+import { WithdrawHandler } from "./application/handlers/withdraw.handler";
+import { AccountEventRepository } from "./domain/repositories/account-event.repository";
+import { AccountsController } from "./http/accounts.controller";
+import { BusWiringService } from "./infra/bus-wiring.service";
+import { MongoEventStore } from "./infra/event-store/event-store";
+import { AccountsProjection } from "./infra/projection/accounts.projection";
 
 // Redis configuration constants
-export const REDIS = 'REDIS_CONNECTION';
-export const IDEMPOTENCY_STORE = 'IDEMPOTENCY_STORE';
+export const REDIS = "REDIS_CONNECTION";
+export const IDEMPOTENCY_STORE = "IDEMPOTENCY_STORE";
 
 @Module({
   imports: [DatabaseModule],
@@ -30,14 +34,16 @@ export const IDEMPOTENCY_STORE = 'IDEMPOTENCY_STORE';
     // Redis connection (optional - falls back to in-memory)
     {
       provide: REDIS,
-      useFactory: async () => {
+      useFactory: async (configService: ConfigService) => {
         try {
-          // Dynamically import ioredis only if available
-          const { default: Redis } = await import("ioredis");
+          // Use require() instead of import() for optional dependency
+          // TypeScript won't check require() at compile time
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const Redis = require("ioredis").default || require("ioredis");
           const redis = new Redis({
-            host: process.env.REDIS_HOST || "localhost",
-            port: parseInt(process.env.REDIS_PORT || "6379"),
-            retryStrategy: (times) => {
+            host: configService.get<string>("REDIS_HOST", "localhost"),
+            port: parseInt(configService.get<string>("REDIS_PORT", "6379")),
+            retryStrategy: (times: number) => {
               const delay = Math.min(times * 50, 2000);
               return delay;
             },
@@ -48,14 +54,15 @@ export const IDEMPOTENCY_STORE = 'IDEMPOTENCY_STORE';
           await redis.ping();
           console.log("[Redis] Connected successfully");
           return redis;
-        } catch (error) {
+        } catch (error: any) {
           console.warn(
             "[Redis] Not available, will use in-memory store:",
-            error.message,
+            error?.message || String(error),
           );
           return null;
         }
       },
+      inject: [ConfigService],
     },
 
     // Idempotency store - Redis if available, otherwise in-memory

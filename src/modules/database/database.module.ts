@@ -1,15 +1,19 @@
 import { Module } from '@nestjs/common';
-import { MongoClient, Db } from 'mongodb';
+import { ConfigService } from "@nestjs/config";
+import { MongoClient, Db } from "mongodb";
 
-export const MONGO = 'MONGO_CONNECTION';
-export const DB = 'MONGO_DB';
+export const MONGO = "MONGO_CONNECTION";
+export const DB = "MONGO_DB";
 
 @Module({
   providers: [
     {
       provide: MONGO,
-      useFactory: async () => {
-        const url = process.env.MONGODB_URL || 'mongodb://localhost:27017';
+      useFactory: async (configService: ConfigService) => {
+        const url = configService.get<string>(
+          "MONGODB_URL",
+          "mongodb://localhost:27017",
+        );
         const client = new MongoClient(url, {
           maxPoolSize: 50, // Max connections in pool
           minPoolSize: 10, // Keep minimum connections warm
@@ -21,14 +25,18 @@ export const DB = 'MONGO_DB';
         console.log("[MongoDB] Connected successfully with connection pooling");
         return client;
       },
+      inject: [ConfigService],
     },
     {
       provide: DB,
-      useFactory: (client: MongoClient): Db => {
-        const dbName = process.env.MONGODB_DB_NAME || 'banking_cqrs';
+      useFactory: (client: MongoClient, configService: ConfigService): Db => {
+        const dbName = configService.get<string>(
+          "MONGODB_DB_NAME",
+          "banking_cqrs",
+        );
         return client.db(dbName);
       },
-      inject: [MONGO],
+      inject: [MONGO, ConfigService],
     },
   ],
   exports: [MONGO, DB],
