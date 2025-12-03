@@ -58,9 +58,7 @@ export class MongoEventStore {
       try {
         if (docs.length) await this.events.insertMany(docs, { ordered: true });
       } catch (e: any) {
-        if (e?.message?.includes("E11000")) {
-          throw new Error("ConcurrencyError: aggregate version conflict");
-        }
+        // Re-throw original error so repository can handle E11000 properly
         throw e;
       }
     });

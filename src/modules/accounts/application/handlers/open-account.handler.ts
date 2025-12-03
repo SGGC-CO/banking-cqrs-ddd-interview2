@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { ResilientCommandHandler } from '../../../../libs/resilience/resilient-handler';
-import { Account } from '../../domain/aggregates/account.aggregate';
-import { AccountEventRepository } from '../../domain/repositories/account-event.repository';
-import { OpenAccountCommand } from '../commands/open-account.command';
+import {
+  AccountAlreadyExistsError,
+  AccountNotFoundError,
+} from "../../../../libs/exceptions/domain.exceptions";
+import { ResilientCommandHandler } from "../../../../libs/resilience/resilient-handler";
+import { Account } from "../../domain/aggregates/account.aggregate";
+import { AccountEventRepository } from "../../domain/repositories/account-event.repository";
+import { OpenAccountCommand } from "../commands/open-account.command";
 
 @Injectable()
 export class OpenAccountHandler extends ResilientCommandHandler<
@@ -14,8 +18,20 @@ export class OpenAccountHandler extends ResilientCommandHandler<
   }
 
   protected async executeInternal(cmd: OpenAccountCommand) {
-    const existing = await this.repo.getById(cmd.accountId);
-    if (existing) throw new Error("Account already exists");
+    // Check if account already exists
+    try {
+      await this.repo.getById(cmd.accountId);
+      // If no exception, account exists
+      throw new AccountAlreadyExistsError(cmd.accountId);
+    } catch (error) {
+      // If AccountNotFoundError, account doesn't exist - this is what we want
+      if (error instanceof AccountNotFoundError) {
+        // Continue to create account
+      } else {
+        // Re-throw other errors (AccountAlreadyExistsError, CircuitBreakerError, etc.)
+        throw error;
+      }
+    }
 
     const agg = Account.open(
       cmd.accountId,

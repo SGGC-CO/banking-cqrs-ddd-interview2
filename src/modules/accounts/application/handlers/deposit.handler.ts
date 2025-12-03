@@ -19,10 +19,7 @@ export class DepositHandler extends ResilientCommandHandler<
 
   protected async executeInternal(cmd: DepositCommand) {
     const acc = await this.repo.getById(cmd.accountId);
-    if (!acc) throw new Error("Account not found");
-
     acc.deposit(cmd.amount);
-
     await this.repo.save(acc);
 
     return { accountId: cmd.accountId };

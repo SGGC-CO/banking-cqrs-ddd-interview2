@@ -1,5 +1,6 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { Collection, Db } from "mongodb";
+import { AccountNotFoundError } from "../../../../libs/exceptions/domain.exceptions";
 import { DB } from "../../../database/database.module";
 import { GetAccountQuery } from "../queries/get-account.query";
 
@@ -14,7 +15,7 @@ export class GetAccountHandler {
 
   async execute(query: GetAccountQuery) {
     const doc = await this.read.findOne({ accountId: query.accountId });
-    if (!doc) throw new Error("Account not found (projection)");
+    if (!doc) throw new AccountNotFoundError(query.accountId);
     return doc;
   }
 }

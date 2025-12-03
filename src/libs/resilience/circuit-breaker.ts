@@ -1,6 +1,8 @@
+import { CircuitBreakerOpenError } from "../exceptions/infrastructure.exceptions";
+
 /**
  * Circuit Breaker Pattern Implementation
- * 
+ *
  * States:
  * - CLOSED: Normal operation, requests pass through
  * - OPEN: Too many failures, requests fail immediately
@@ -8,9 +10,9 @@
  */
 
 export enum CircuitState {
-  CLOSED = 'CLOSED',
-  OPEN = 'OPEN',
-  HALF_OPEN = 'HALF_OPEN',
+  CLOSED = "CLOSED",
+  OPEN = "OPEN",
+  HALF_OPEN = "HALF_OPEN",
 }
 
 export interface CircuitBreakerOptions {
@@ -20,10 +22,10 @@ export interface CircuitBreakerOptions {
   name?: string; // Name for logging purposes
 }
 
-export class CircuitBreakerError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'CircuitBreakerError';
+export class CircuitBreakerError extends CircuitBreakerOpenError {
+  constructor(serviceName: string, retryAfterMs: number) {
+    super(serviceName, retryAfterMs);
+    this.name = "CircuitBreakerError";
   }
 }
 
@@ -35,7 +37,7 @@ export class CircuitBreaker {
   private readonly name: string;
 
   constructor(private readonly options: CircuitBreakerOptions) {
-    this.name = options.name || 'CircuitBreaker';
+    this.name = options.name || "CircuitBreaker";
   }
 
   /**
@@ -44,9 +46,8 @@ export class CircuitBreaker {
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state === CircuitState.OPEN) {
       if (Date.now() < this.nextAttemptTime) {
-        const error = new CircuitBreakerError(
-          `[${this.name}] Circuit breaker is OPEN. Service unavailable.`
-        );
+        const retryAfterMs = this.nextAttemptTime - Date.now();
+        const error = new CircuitBreakerError(this.name, retryAfterMs);
         console.error(error.message);
         throw error;
       }
@@ -75,13 +76,15 @@ export class CircuitBreaker {
     if (this.state === CircuitState.HALF_OPEN) {
       this.successCount++;
       console.log(
-        `[${this.name}] Success in HALF_OPEN (${this.successCount}/${this.options.successThreshold})`
+        `[${this.name}] Success in HALF_OPEN (${this.successCount}/${this.options.successThreshold})`,
       );
 
       if (this.successCount >= this.options.successThreshold) {
         this.state = CircuitState.CLOSED;
         this.successCount = 0;
-        console.log(`[${this.name}] Circuit breaker CLOSED - service recovered`);
+        console.log(
+          `[${this.name}] Circuit breaker CLOSED - service recovered`,
+        );
       }
     }
   }
@@ -92,7 +95,7 @@ export class CircuitBreaker {
   private onFailure(): void {
     this.failureCount++;
     console.error(
-      `[${this.name}] Failure detected (${this.failureCount}/${this.options.failureThreshold})`
+      `[${this.name}] Failure detected (${this.failureCount}/${this.options.failureThreshold})`,
     );
 
     if (
@@ -102,7 +105,7 @@ export class CircuitBreaker {
       this.state = CircuitState.OPEN;
       this.nextAttemptTime = Date.now() + this.options.timeout;
       console.error(
-        `[${this.name}] Circuit breaker OPEN - will retry in ${this.options.timeout}ms`
+        `[${this.name}] Circuit breaker OPEN - will retry in ${this.options.timeout}ms`,
       );
     }
   }

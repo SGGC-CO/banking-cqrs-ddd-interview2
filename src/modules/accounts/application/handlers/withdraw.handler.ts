@@ -22,8 +22,6 @@ export class WithdrawHandler extends ResilientCommandHandler<
    */
   protected async executeInternal(cmd: WithdrawCommand) {
     const acc = await this.repo.getById(cmd.accountId);
-    if (!acc) throw new Error("Account not found");
-
     acc.withdraw(cmd.amount);
     await this.repo.save(acc);
 

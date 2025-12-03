@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Query } from './query';
+import { QueryHandlerNotFoundError } from "../exceptions/application.exceptions";
+import { Query } from "./query";
 
 type QueryHandler<T extends Query, R = any> = {
   execute(query: T): Promise<R> | R;
@@ -15,7 +16,9 @@ export class QueryBus {
 
   async execute<T extends Query, R = any>(query: T): Promise<R> {
     const handler = this.handlers.get(query.constructor.name);
-    if (!handler) throw new Error(`No handler for ${query.constructor.name}`);
+    if (!handler) {
+      throw new QueryHandlerNotFoundError(query.constructor.name);
+    }
     return handler.execute(query);
   }
 }

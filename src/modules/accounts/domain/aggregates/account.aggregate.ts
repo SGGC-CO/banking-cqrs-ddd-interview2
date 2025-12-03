@@ -1,7 +1,11 @@
 import { AggregateRoot } from '../../../../libs/cqrs/aggregate-root';
-import { AccountOpenedEvent } from '../events/account-opened.event';
-import { DepositedEvent } from '../events/deposited.event';
-import { WithdrawnEvent } from '../events/withdrawn.event';
+import {
+  InsufficientFundsError,
+  InvalidAmountError,
+} from "../../../../libs/exceptions/domain.exceptions";
+import { AccountOpenedEvent } from "../events/account-opened.event";
+import { DepositedEvent } from "../events/deposited.event";
+import { WithdrawnEvent } from "../events/withdrawn.event";
 
 export class Account extends AggregateRoot {
   private _ownerId: string;
@@ -15,7 +19,10 @@ export class Account extends AggregateRoot {
     initialBalance: number,
   ) {
     if (initialBalance < 0)
-      throw new Error("Initial balance cannot be negative");
+      throw new InvalidAmountError(
+        initialBalance,
+        "Initial balance cannot be negative",
+      );
     const acc = new Account();
     acc.apply(new AccountOpenedEvent(id, ownerId, currency, initialBalance));
     return acc;
@@ -29,7 +36,8 @@ export class Account extends AggregateRoot {
   }
 
   deposit(amount: number) {
-    if (amount <= 0) throw new Error("Deposit amount must be positive");
+    if (amount <= 0)
+      throw new InvalidAmountError(amount, "Deposit amount must be positive");
     this.apply(new DepositedEvent(this.id!, amount));
   }
 
@@ -38,8 +46,14 @@ export class Account extends AggregateRoot {
    * Validates amount and prevents overdraft
    */
   withdraw(amount: number) {
-    if (amount <= 0) throw new Error("Withdrawal amount must be positive");
-    if (this._balance < amount) throw new Error("Insufficient funds");
+    if (amount <= 0)
+      throw new InvalidAmountError(
+        amount,
+        "Withdrawal amount must be positive",
+      );
+    if (this._balance < amount) {
+      throw new InsufficientFundsError(this.id!, amount, this._balance);
+    }
     this.apply(new WithdrawnEvent(this.id!, amount));
   }
 

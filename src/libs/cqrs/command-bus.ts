@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Command } from './command';
+import { CommandHandlerNotFoundError } from "../exceptions/application.exceptions";
+import { Command } from "./command";
 
 type CommandHandler<T extends Command> = {
   execute(command: T): Promise<any> | any;
@@ -18,7 +19,9 @@ export class CommandBus {
    */
   async execute<T extends Command, R = any>(command: T): Promise<R> {
     const handler = this.handlers.get(command.constructor.name);
-    if (!handler) throw new Error(`No handler for ${command.constructor.name}`);
+    if (!handler) {
+      throw new CommandHandlerNotFoundError(command.constructor.name);
+    }
     return handler.execute(command);
   }
 }
