@@ -27,12 +27,12 @@ export class AccountsProjection {
       if (event instanceof AccountOpenedEvent) {
         await coll.updateOne(
           { accountId: event.accountId },
-          {
-            $set: {
-              accountId: event.accountId,
-              ownerId: event.ownerId,
+          { 
+            $set: { 
+              accountId: event.accountId, 
+              ownerId: event.ownerId, 
               currency: event.currency,
-            },
+            }, 
             $setOnInsert: { balance: 0 },
           },
           { upsert: true },
