@@ -64,7 +64,10 @@ export class MongoEventStore {
 
         // Handle optimistic concurrency violations (MongoDB duplicate key error)
         if (message.includes("E11000")) {
-          throw new ConcurrencyError(aggregateId, expectedVersion);
+          // The version that failed is the first version we attempted to save
+          // expectedVersion is the version before the new events, so first attempted version is expectedVersion + 1
+          const attemptedVersion = expectedVersion + 1;
+          throw new ConcurrencyError(aggregateId, attemptedVersion);
         }
 
         // Normalize all other Mongo/circuit-breaker errors into our exception hierarchy
