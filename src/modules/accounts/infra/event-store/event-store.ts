@@ -1,6 +1,8 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { Collection, Db } from "mongodb";
 import { CircuitBreaker } from "../../../../libs/resilience/circuit-breaker";
+import { normalizeMongoError } from "../../../../libs/exceptions/maps/mongo-error.util";
+import { ConcurrencyError } from "../../../../libs/exceptions/domain.exceptions";
 import { DB } from "../../../database/database.module";
 
 export interface StoredEvent {
@@ -57,9 +59,16 @@ export class MongoEventStore {
 
       try {
         if (docs.length) await this.events.insertMany(docs, { ordered: true });
-      } catch (e: any) {
-        // Re-throw original error so repository can handle E11000 properly
-        throw e;
+      } catch (error) {
+        const message = (error as Error)?.message || "";
+
+        // Handle optimistic concurrency violations (MongoDB duplicate key error)
+        if (message.includes("E11000")) {
+          throw new ConcurrencyError(aggregateId, expectedVersion);
+        }
+
+        // Normalize all other Mongo/circuit-breaker errors into our exception hierarchy
+        normalizeMongoError(error, "append", "events");
       }
     });
   }
@@ -69,8 +78,12 @@ export class MongoEventStore {
    */
   async load(aggregateId: string) {
     return this.circuitBreaker.execute(async () => {
-      const cur = this.events.find({ aggregateId }).sort({ version: 1 });
-      return cur.toArray();
+      try {
+        const cur = this.events.find({ aggregateId }).sort({ version: 1 });
+        return await cur.toArray();
+      } catch (error) {
+        normalizeMongoError(error, "load", "events");
+      }
     });
   }
 
