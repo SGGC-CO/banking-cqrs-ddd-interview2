@@ -3,6 +3,7 @@ import { Response } from "express";
 import { MongoEventStore } from "../accounts/infra/event-store/event-store";
 import { AccountsProjection } from "../accounts/infra/projection/accounts.projection";
 import { ErrorMetricsService } from "../../libs/monitoring/error-metrics.service";
+import { ErrorActionService } from "../../libs/exceptions/error-action.service";
 
 @Controller("admin")
 export class AdminController {
@@ -10,6 +11,7 @@ export class AdminController {
     private readonly eventStore: MongoEventStore,
     private readonly projection: AccountsProjection,
     private readonly errorMetrics: ErrorMetricsService,
+    private readonly errorActionService: ErrorActionService,
   ) {}
 
   @Get("health")
@@ -63,6 +65,44 @@ export class AdminController {
         message: "Metrics not available - Prometheus client not configured",
       });
     }
+  }
+
+  /**
+   * Get error action status and statistics
+   * Shows: pending, running, success, failed, retries, average execution time
+   */
+  @Get("error-actions/status")
+  getErrorActionStatus() {
+    return {
+      statistics: this.errorActionService.getStatistics(),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Get critical error actions pending or running
+   * Useful for health checks and alerts
+   */
+  @Get("error-actions/critical-pending")
+  getCriticalPendingActions() {
+    return {
+      criticalPending: this.errorActionService.getCriticalPending(),
+      count: this.errorActionService.getCriticalPending().length,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Get recently failed critical error actions
+   * Useful for debugging and monitoring
+   */
+  @Get("error-actions/critical-failures")
+  getCriticalFailures() {
+    return {
+      criticalFailures: this.errorActionService.getCriticalFailures(),
+      count: this.errorActionService.getCriticalFailures().length,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**
