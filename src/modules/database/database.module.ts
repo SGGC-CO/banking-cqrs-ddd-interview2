@@ -1,11 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MongoClient, Db } from "mongodb";
+import { MonitoringModule } from "../../libs/monitoring/monitoring.module";
+import { ErrorActionService } from "../../libs/exceptions/error-action.service";
+import { DatabaseConnectionErrorHandler } from "./error-handlers/database-connection-error.handler";
 
 export const MONGO = "MONGO_CONNECTION";
 export const DB = "MONGO_DB";
 
 @Module({
+  imports: [MonitoringModule],
   providers: [
     {
       provide: MONGO,
@@ -38,8 +42,17 @@ export const DB = "MONGO_DB";
       },
       inject: [MONGO, ConfigService],
     },
+    DatabaseConnectionErrorHandler,
   ],
   exports: [MONGO, DB],
 })
-export class DatabaseModule {}
+export class DatabaseModule implements OnModuleInit {
+  constructor(
+    private readonly errorActionService: ErrorActionService,
+    private readonly dbErrorHandler: DatabaseConnectionErrorHandler,
+  ) {}
 
+  onModuleInit() {
+    this.errorActionService.registerHandler(this.dbErrorHandler);
+  }
+}
